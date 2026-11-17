@@ -419,6 +419,10 @@ void HighsMipSolverData::startAnalyticCenterComputation(
     // Highs instantiation
     Highs ipm;
     ipm.setProfiling(mipsolver.profiling_);
+    if (mipsolver.options_mip_->presolve_dependency_global_cap)
+      ipm.setOptionValue("time_limit",
+                         std::max(0.0, mipsolver.options_mip_->time_limit -
+                                           mipsolver.timer_.read()));
     ipm.setOptionValue("output_flag", false);
     const std::vector<double>& sol = ipm.getSolution().col_value;
     // Don't use presolve - because this can lead to postsolve putting
@@ -1257,6 +1261,9 @@ try_again:
     // Highs instantiation
     Highs tmpSolver;
     tmpSolver.setProfiling(mipsolver.profiling_);
+    tmpSolver.setOptionValue(
+        "presolve_dependency_global_cap",
+        mipsolver.options_mip_->presolve_dependency_global_cap);
     const bool debug_report = false;
     if (debug_report) {
       tmpSolver.setOptionValue("log_dev_level", 2);

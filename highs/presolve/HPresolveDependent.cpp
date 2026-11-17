@@ -88,10 +88,17 @@ HPresolve::Result HPresolve::removeDependentEquations(
   //
   // ToDo: This is strictly non-deterministic, but so conservative
   // that it'll only reap the cases when factor.build never finishes
+  //
+  // With presolve_dependency_global_cap, the factorization is limited
+  // only by the remaining global time limit, without predicting its
+  // completion time, so the reductions made do not depend on host load
   const double kMaxDependentEquationsTime = 100;
-  const double time_limit = std::max(
-      1.0, std::min(0.01 * options->time_limit, kMaxDependentEquationsTime));
-  factor.setTimeLimit(time_limit);
+  const bool global_cap = options->presolve_dependency_global_cap;
+  const double time_limit =
+      global_cap ? std::max(0.0, options->time_limit - this->timer->read())
+                 : std::max(1.0, std::min(0.01 * options->time_limit,
+                                          kMaxDependentEquationsTime));
+  factor.setTimeLimit(time_limit, !global_cap);
   // Determine rank deficiency of the equations
   if (!silent)
     highsLogDev(options->log_options, HighsLogType::kInfo,
@@ -106,6 +113,15 @@ HPresolve::Result HPresolve::removeDependentEquations(
   HighsInt num_removed_nz = 0;
   HighsInt num_fictitious_rows_skipped = 0;
   if (build_return == kBuildKernelReturnTimeout) {
+    if (global_cap) {
+      // Do not continue from a load-dependent skip of this rule: stop
+      // presolve, and the exhausted global time limit is reported by
+      // the next solver check
+      analysis_.logging_on_ = logging_on;
+      if (logging_on)
+        analysis_.stopPresolveRuleLog(kPresolveRuleDependentEquations);
+      return Result::kStopped;
+    }
     // HFactor::build has timed out, so just return
     if (!silent) {
       if (options->log_dev_level > 0)

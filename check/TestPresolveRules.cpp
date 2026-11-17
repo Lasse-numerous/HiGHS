@@ -4,11 +4,13 @@
 #include "Highs.h"
 #include "catch.hpp"
 #include "mip/HighsCliqueTable.h"
+#include "mip/HighsLpRelaxation.h"
 #include "mip/HighsMipSolver.h"
 #include "mip/HighsMipSolverData.h"
 #include "parallel/HighsParallel.h"
 #include "presolve/HPresolve.h"
 #include "presolve/HighsPostsolveStack.h"
+#include "util/HFactor.h"
 
 const bool dev_run = false;
 
@@ -1655,4 +1657,87 @@ void presolveOffOn(const std::string& message, const HighsLp& lp, Highs& h,
                   require_presolved_model_num_row,
                   require_presolved_model_num_nz);
   }
+}
+
+TEST_CASE("test-presolve-dependency-global-cap",
+          "[highs_test_presolve_rules]") {
+  // The option is off by default, so the existing dependent-equations
+  // time limit and its completion-time prediction are unchanged
+  Highs h;
+  h.setOptionValue("output_flag", dev_run);
+  bool global_cap = true;
+  REQUIRE(h.getOptionValue("presolve_dependency_global_cap", global_cap) ==
+          HighsStatus::kOk);
+  REQUIRE(!global_cap);
+
+  // The MIP solver's LP relaxation inherits the option
+  for (const bool requested : {false, true}) {
+    REQUIRE(h.setOptionValue("presolve_dependency_global_cap", requested) ==
+            HighsStatus::kOk);
+    HighsCallback callback(&h);
+    HighsLp empty_lp;
+    HighsSolution solution;
+    HighsMipSolver mip(callback, h.getOptions(), empty_lp, solution);
+    HighsLpRelaxation relaxation(mip);
+    bool inherited = !requested;
+    REQUIRE(relaxation.getLpSolver().getOptionValue(
+                "presolve_dependency_global_cap", inherited) ==
+            HighsStatus::kOk);
+    REQUIRE(inherited == requested);
+  }
+
+  // Without prediction, HFactor::build stops only on the limit itself: a
+  // zero limit times out and no limit completes, as with prediction
+  HighsSparseMatrix matrix;
+  matrix.num_col_ = matrix.num_row_ = 128;
+  matrix.start_ = {0};
+  for (HighsInt iCol = 0; iCol < matrix.num_col_; iCol++) {
+    for (HighsInt iRow = 0; iRow < matrix.num_row_; iRow++) {
+      matrix.index_.push_back(iRow);
+      matrix.value_.push_back(iRow == iCol ? 256.0 : 1.0);
+    }
+    matrix.start_.push_back(matrix.index_.size());
+  }
+  for (const bool predict : {false, true}) {
+    for (const double limit : {0.0, kHighsInf}) {
+      std::vector<HighsInt> basic_set(matrix.num_col_);
+      std::iota(basic_set.begin(), basic_set.end(), 0);
+      HFactor factor;
+      factor.setup(matrix, basic_set);
+      factor.setTimeLimit(limit, predict);
+      REQUIRE(factor.build() == (limit == 0.0 ? kBuildKernelReturnTimeout : 0));
+    }
+  }
+
+  // With time to spare, the option makes the same reductions and finds the
+  // same optimum: row 3 is the sum of rows 0 and 2, row 1 is twice row 0
+  HighsLp lp;
+  lp.num_col_ = 4;
+  lp.num_row_ = 4;
+  lp.col_cost_ = {1, 2, 3, 1};
+  lp.col_lower_.assign(lp.num_col_, 0);
+  lp.col_upper_.assign(lp.num_col_, 10);
+  lp.row_lower_ = {4, 8, 10, 14};
+  lp.row_upper_ = lp.row_lower_;
+  lp.a_matrix_.format_ = MatrixFormat::kRowwise;
+  lp.a_matrix_.start_ = {0, 4, 8, 12, 16};
+  lp.a_matrix_.index_ = {0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3};
+  lp.a_matrix_.value_ = {1, 1, 1, 1, 2, 2, 2, 2, 1, 2, 3, 4, 2, 3, 4, 5};
+  HighsInt presolved_num_row[2];
+  double objective[2];
+  for (const bool requested : {false, true}) {
+    Highs highs;
+    highs.setOptionValue("output_flag", dev_run);
+    REQUIRE(highs.setOptionValue("presolve_dependency_global_cap", requested) ==
+            HighsStatus::kOk);
+    REQUIRE(highs.passModel(lp) == HighsStatus::kOk);
+    REQUIRE(highs.presolve() == HighsStatus::kOk);
+    presolved_num_row[requested] = highs.getPresolvedLp().num_row_;
+    REQUIRE(highs.run() == HighsStatus::kOk);
+    REQUIRE(highs.getModelStatus() == HighsModelStatus::kOptimal);
+    objective[requested] = highs.getInfo().objective_function_value;
+  }
+  REQUIRE(presolved_num_row[1] == presolved_num_row[0]);
+  REQUIRE(presolved_num_row[0] < lp.num_row_);
+  REQUIRE(objective[1] == objective[0]);
 }

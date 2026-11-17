@@ -180,6 +180,9 @@ HighsLpRelaxation::HighsLpRelaxation(const HighsMipSolver& mipsolver)
     : mipsolver(mipsolver), worker_(nullptr) {
   lpsolver.setOptionValue("output_flag", false);
   lpsolver.setOptionValue("random_seed", mipsolver.options_mip_->random_seed);
+  lpsolver.setOptionValue(
+      "presolve_dependency_global_cap",
+      mipsolver.options_mip_->presolve_dependency_global_cap);
   // Set primal feasibility tolerance for LP solves according to
   // mip_feasibility_tolerance, and smaller tolerance for dual
   // feasibility
@@ -1365,6 +1368,13 @@ HighsLpRelaxation::Status HighsLpRelaxation::run(bool resolve_on_error) {
         // Highs instantiation
         Highs ipm;
         ipm.setProfiling(mipsolver.profiling_);
+        ipm.setOptionValue(
+            "presolve_dependency_global_cap",
+            mipsolver.options_mip_->presolve_dependency_global_cap);
+        if (mipsolver.options_mip_->presolve_dependency_global_cap)
+          ipm.setOptionValue("time_limit",
+                             std::max(0.0, mipsolver.options_mip_->time_limit -
+                                               mipsolver.timer_.read()));
         ipm.setOptionValue("output_flag", false);
         // check if only root presolve is allowed
         const bool use_presolve =

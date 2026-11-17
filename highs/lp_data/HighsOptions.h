@@ -462,6 +462,7 @@ struct HighsOptionsStruct {
   HighsInt presolve_substitution_maxfillin;
   HighsInt presolve_rule_off;
   HighsInt presolve_rule_test;
+  bool presolve_dependency_global_cap;
   bool presolve_rule_logging;
   bool presolve_remove_slacks;
   bool presolve_fm_obj_reformulation;
@@ -639,6 +640,7 @@ struct HighsOptionsStruct {
         presolve_substitution_maxfillin(0),
         presolve_rule_off(0),
         presolve_rule_test(0),
+        presolve_dependency_global_cap(false),
         presolve_rule_logging(false),
         presolve_remove_slacks(false),
         presolve_fm_obj_reformulation(false),
@@ -1688,6 +1690,13 @@ class HighsOptions : public HighsOptionsStruct {
         "presolve_rule_test", "Presolve rule to test - DEV only!", advanced,
         &presolve_rule_test, 0, 0, kPresolveRuleMax);
     records.push_back(record_int);
+
+    record_bool = new OptionRecordBool(
+        "presolve_dependency_global_cap",
+        "Use only the global safety cap for dependent-equation factorization; "
+        "timeout stops the solve instead of skipping the rule",
+        advanced, &presolve_dependency_global_cap, false);
+    records.push_back(record_bool);
 
     record_bool = new OptionRecordBool(
         "presolve_rule_logging", "Log effectiveness of presolve rules for LP",

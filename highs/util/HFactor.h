@@ -122,6 +122,7 @@ class HFactor {
         pivot_tolerance(0.0),
         highs_debug_level(0),
         time_limit_(0.0),
+        predict_time_limit_(true),
         use_original_HFactor_logic(false),
         debug_report_(false),
         basis_matrix_limit_size(0),
@@ -244,7 +245,7 @@ class HFactor {
   /**
    * @brief Sets a time limit
    */
-  void setTimeLimit(const double time_limit);
+  void setTimeLimit(const double time_limit, const bool predict = true);
 
   /**
    * @brief Updates instance with respect to new columns in the
@@ -361,6 +362,7 @@ class HFactor {
   double pivot_tolerance;
   HighsInt highs_debug_level;
   double time_limit_;
+  bool predict_time_limit_;
 
   struct LogData {
     bool output_flag;

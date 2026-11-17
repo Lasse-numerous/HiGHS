@@ -537,7 +537,8 @@ bool HFactor::setPivotThreshold(const double new_pivot_threshold) {
   return true;
 }
 
-void HFactor::setTimeLimit(const double time_limit) {
+void HFactor::setTimeLimit(const double time_limit, const bool predict) {
+  this->predict_time_limit_ = predict;
   this->time_limit_ = kHighsInf;
   if (time_limit < 0) return;
   this->time_limit_ = time_limit;
@@ -1000,7 +1001,7 @@ HighsInt HFactor::buildKernel() {
       max_time_bound_ = std::max(total_time_bound, max_time_bound_);
       // Bail out if current or expected time exceeds the limit
       if (current_time > this->time_limit_ ||
-          total_time_bound > this->time_limit_)
+          (this->predict_time_limit_ && total_time_bound > this->time_limit_))
         return kBuildKernelReturnTimeout;
       // Clear the record of vectors of indices and values having to
       // be moved in order to be resized
