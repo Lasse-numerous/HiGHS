@@ -6064,9 +6064,11 @@ HPresolve::Result HPresolve::removeDependentEquations(
   //
   // ToDo: This is strictly non-deterministic, but so conservative
   // that it'll only reap the cases when factor.build never finishes
-  const double time_limit =
-      std::max(1.0, std::min(0.01 * options->time_limit, 1000.0));
-  factor.setTimeLimit(time_limit);
+  const bool global_cap = options->presolve_dependency_global_cap;
+  const double time_limit = global_cap
+      ? std::max(0.0, options->time_limit - this->timer->read())
+      : std::max(1.0, std::min(0.01 * options->time_limit, 1000.0));
+  factor.setTimeLimit(time_limit, !global_cap);
   // Determine rank deficiency of the equations
   highsLogUser(options->log_options, HighsLogType::kInfo,
                "Dependent equations search running on %d equations with time "
@@ -6076,6 +6078,14 @@ HPresolve::Result HPresolve::removeDependentEquations(
   HighsInt build_return = factor.build();
   time_taken += this->timer->read();
   if (build_return == kBuildKernelReturnTimeout) {
+    if (global_cap) {
+      // Do not keep a load-dependent partial presolve result. The existing
+      // stopped path reports the exhausted global time limit to the caller.
+      analysis_.logging_on_ = logging_on;
+      if (logging_on)
+        analysis_.stopPresolveRuleLog(kPresolveRuleDependentEquations);
+      return Result::kStopped;
+    }
     // HFactor::build has timed out, so just return
     highsLogUser(options->log_options, HighsLogType::kInfo,
                  "Dependent equations search terminated after %.3gs due to "

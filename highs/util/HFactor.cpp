@@ -537,7 +537,8 @@ bool HFactor::setPivotThreshold(const double new_pivot_threshold) {
   return true;
 }
 
-void HFactor::setTimeLimit(const double time_limit) {
+void HFactor::setTimeLimit(const double time_limit, const bool predict) {
+  this->predict_time_limit_ = predict;
   this->time_limit_ = kHighsInf;
   if (time_limit < 0) return;
   this->time_limit_ = time_limit;
@@ -905,7 +906,7 @@ HighsInt HFactor::buildKernel() {
       double remaining_time_bound = average_iteration_time * iterations_left;
       double total_time_bound = current_time + remaining_time_bound;
       if (current_time > this->time_limit_ ||
-          total_time_bound > this->time_limit_)
+          (this->predict_time_limit_ && total_time_bound > this->time_limit_))
         return kBuildKernelReturnTimeout;
     }
 

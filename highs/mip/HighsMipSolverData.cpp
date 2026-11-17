@@ -346,6 +346,9 @@ void HighsMipSolverData::startAnalyticCenterComputation(
     // first check if the analytic centre computation should be cancelled, e.g.
     // due to early return in the root node evaluation
     Highs ipm;
+    if (mipsolver.options_mip_->presolve_dependency_global_cap)
+      ipm.setOptionValue("time_limit", std::max(
+          0.0, mipsolver.options_mip_->time_limit - mipsolver.timer_.read()));
     ipm.setOptionValue("output_flag", false);
     const std::vector<double>& sol = ipm.getSolution().col_value;
     // Don't use presolve - because this can lead to postsolve putting
@@ -1137,6 +1140,8 @@ try_again:
     double time_available = std::max(
         mipsolver.options_mip_->time_limit - mipsolver.timer_.read(), 0.1);
     Highs tmpSolver;
+    tmpSolver.setOptionValue("presolve_dependency_global_cap",
+                             mipsolver.options_mip_->presolve_dependency_global_cap);
     const bool debug_report = false;
     if (debug_report) {
       tmpSolver.setOptionValue("log_dev_level", 2);

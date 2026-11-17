@@ -423,6 +423,7 @@ struct HighsOptionsStruct {
   HighsInt restart_presolve_reduction_limit;
   HighsInt presolve_substitution_maxfillin;
   HighsInt presolve_rule_off;
+  bool presolve_dependency_global_cap;
   bool presolve_rule_logging;
   bool presolve_remove_slacks;
   bool simplex_initial_condition_check;
@@ -585,6 +586,7 @@ struct HighsOptionsStruct {
         restart_presolve_reduction_limit(0),
         presolve_substitution_maxfillin(0),
         presolve_rule_off(0),
+        presolve_dependency_global_cap(false),
         presolve_rule_logging(false),
         presolve_remove_slacks(false),
         simplex_initial_condition_check(false),
@@ -1549,6 +1551,13 @@ class HighsOptions : public HighsOptionsStruct {
         "presolve_rule_off", "Bit mask of presolve rules that are not allowed",
         advanced, &presolve_rule_off, 0, 0, kHighsIInf);
     records.push_back(record_int);
+
+    record_bool = new OptionRecordBool(
+        "presolve_dependency_global_cap",
+        "Use only the global safety cap for dependent-equation factorization; "
+        "timeout stops the solve instead of skipping the rule",
+        advanced, &presolve_dependency_global_cap, false);
+    records.push_back(record_bool);
 
     record_bool = new OptionRecordBool(
         "presolve_rule_logging", "Log effectiveness of presolve rules for LP",
